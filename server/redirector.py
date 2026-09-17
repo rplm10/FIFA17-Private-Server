@@ -209,20 +209,32 @@ def start_redirector_server(
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 
-    # FIFA 17's 2016-era Blaze client offers cipher suites that modern
-    # OpenSSL/Python security defaults may reject. This listener is loopback-only
-    # and dedicated to the preservation emulator, so allow the legacy TLS 1.0-1.2
-    # cipher range here rather than weakening system-wide TLS settings.
+    # Captured FIFA 17 ClientHello (PC): TLS 1.2 with static RSA key exchange.
+    # Keep this loopback-only listener restricted to the AES/RSA suites the
+    # client actually advertised instead of enabling unrelated legacy suites.
     if hasattr(ssl, "TLSVersion"):
         context.minimum_version = ssl.TLSVersion.TLSv1
         context.maximum_version = ssl.TLSVersion.TLSv1_2
-    context.set_ciphers("ALL:@SECLEVEL=0")
+    fifa_rsa_ciphers = (
+        "AES256-GCM-SHA384:"
+        "AES128-GCM-SHA256:"
+        "AES256-SHA256:"
+        "AES128-SHA256:"
+        "AES256-SHA:"
+        "AES128-SHA:"
+        "@SECLEVEL=0"
+    )
+    context.set_ciphers(fifa_rsa_ciphers)
     context.load_cert_chain(certfile=str(cert), keyfile=str(key))
 
-    enabled_ciphers = context.get_ciphers()
+    enabled_ciphers = [
+        item["name"]
+        for item in context.get_ciphers()
+        if item.get("protocol") != "TLSv1.3"
+    ]
     print(
-        f"[REDIRECTOR/TLS] compatibility mode: TLSv1-TLSv1.2, "
-        f"{len(enabled_ciphers)} cipher entries enabled"
+        "[REDIRECTOR/TLS] FIFA17 RSA profile: TLSv1-TLSv1.2; "
+        + ", ".join(enabled_ciphers)
     )
 
     def log_sni(ssl_sock: ssl.SSLSocket, server_name: str | None, _context: ssl.SSLContext) -> None:
