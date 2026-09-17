@@ -12,14 +12,26 @@ Set-Location $Root
 Write-Host "[1/4] Installing Python dependencies..."
 python -m pip install -r requirements.txt
 
-if (-not (Test-Path "$Root\certs\fifa17_local_ca.crt") -or -not (Test-Path "$Root\certs\redirector.crt")) {
-    Write-Host "[2/4] Generating local TLS certificates..."
+$ProfileMarker = "$Root\certs\gos_profile_v1.txt"
+$NeedCerts = (-not (Test-Path "$Root\certs\fifa17_local_ca.crt")) -or
+             (-not (Test-Path "$Root\certs\redirector.crt")) -or
+             (-not (Test-Path $ProfileMarker))
+
+if ($NeedCerts) {
+    Write-Host "[2/4] Migrating to GOS-style local TLS certificates..."
+
+    # Remove only the old development CA created by earlier versions of this project.
+    Get-ChildItem Cert:\LocalMachine\Root |
+        Where-Object { $_.Subject -eq "CN=FIFA 17 Local FUT Development CA" } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
     python tools\generate_certs.py
+    if ($LASTEXITCODE -ne 0) { throw "Certificate generation failed." }
 } else {
-    Write-Host "[2/4] TLS certificates already exist."
+    Write-Host "[2/4] GOS-style local TLS certificates already exist."
 }
 
-Write-Host "[3/4] Trusting the local development CA..."
+Write-Host "[3/4] Trusting the local GOS development CA..."
 Import-Certificate -FilePath "$Root\certs\fifa17_local_ca.crt" -CertStoreLocation "Cert:\LocalMachine\Root" | Out-Null
 
 $HostsPath = "$env:SystemRoot\System32\drivers\etc\hosts"
@@ -36,5 +48,6 @@ ipconfig /flushdns | Out-Null
 Write-Host ""
 Write-Host "Installed local FIFA 17 redirector routing:" -ForegroundColor Green
 Write-Host "  $HostName -> 127.0.0.1"
+Write-Host "  certificate profile -> GOS 2015-compatible local development chain"
 Write-Host ""
 Write-Host "Next: python -m server.main"
