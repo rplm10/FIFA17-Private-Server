@@ -208,7 +208,22 @@ def start_redirector_server(
         )
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+
+    # FIFA 17's 2016-era Blaze client offers cipher suites that modern
+    # OpenSSL/Python security defaults may reject. This listener is loopback-only
+    # and dedicated to the preservation emulator, so allow the legacy TLS 1.0-1.2
+    # cipher range here rather than weakening system-wide TLS settings.
+    if hasattr(ssl, "TLSVersion"):
+        context.minimum_version = ssl.TLSVersion.TLSv1
+        context.maximum_version = ssl.TLSVersion.TLSv1_2
+    context.set_ciphers("ALL:@SECLEVEL=0")
     context.load_cert_chain(certfile=str(cert), keyfile=str(key))
+
+    enabled_ciphers = context.get_ciphers()
+    print(
+        f"[REDIRECTOR/TLS] compatibility mode: TLSv1-TLSv1.2, "
+        f"{len(enabled_ciphers)} cipher entries enabled"
+    )
 
     def log_sni(ssl_sock: ssl.SSLSocket, server_name: str | None, _context: ssl.SSLContext) -> None:
         try:
