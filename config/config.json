@@ -13,7 +13,7 @@
     "cert_path": "certs/redirector.crt",
     "key_path": "certs/redirector.key"
   },
-  "probe_ports": [4216, 10051, 17502, 42232, 3216],
+  "probe_ports": [10051, 17502, 42232],
   "starting_coins": 0,
   "starting_points": 0,
   "identity": {
@@ -21,5 +21,5 @@
     "persona_id": 1,
     "display_name": "LocalPlayer"
   },
-  "notes": "42230 is now the HTTPS redirector. The returned Blaze backend port remains a capture probe until the FIFA 17 FIRE2/TDF contract is implemented."
+  "notes": "42230 is the HTTPS redirector. 10051 is the temporary Blaze capture target. Ports 4216 and 3216 are intentionally not bound because they may be used by the local Origin/EA SDK (LSX) during game startup."
 }
