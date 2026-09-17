@@ -3,7 +3,17 @@
   "http_port": 8099,
   "database_path": "data/fut17.sqlite3",
   "capture_dir": "logs/captures",
-  "probe_ports": [42230, 4216, 10051, 17502, 42232, 3216],
+  "redirector": {
+    "enabled": true,
+    "hostname": "winter15.gosredirector.ea.com",
+    "port": 42230,
+    "backend_host": "127.0.0.1",
+    "backend_port": 10051,
+    "backend_secure": true,
+    "cert_path": "certs/redirector.crt",
+    "key_path": "certs/redirector.key"
+  },
+  "probe_ports": [4216, 10051, 17502, 42232, 3216],
   "starting_coins": 0,
   "starting_points": 0,
   "identity": {
@@ -11,5 +21,5 @@
     "persona_id": 1,
     "display_name": "LocalPlayer"
   },
-  "notes": "Probe ports are discovery listeners only until FIFA 17-specific Blaze/LSX contracts are implemented."
+  "notes": "42230 is now the HTTPS redirector. The returned Blaze backend port remains a capture probe until the FIFA 17 FIRE2/TDF contract is implemented."
 }
