@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import datetime as dt
 import socket
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from server.tls_hello import parse_client_hello, render_client_hello
 
-ROOT = Path(__file__).resolve().parents[1]
 CAPTURE_DIR = ROOT / "logs" / "captures"
 HOST = "127.0.0.1"
 PORT = 42230
