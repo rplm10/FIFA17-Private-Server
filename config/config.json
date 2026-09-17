@@ -1,0 +1,15 @@
+{
+  "bind_host": "127.0.0.1",
+  "http_port": 8099,
+  "database_path": "data/fut17.sqlite3",
+  "capture_dir": "logs/captures",
+  "probe_ports": [42230, 4216, 10051, 17502, 42232, 3216],
+  "starting_coins": 0,
+  "starting_points": 0,
+  "identity": {
+    "user_id": 1,
+    "persona_id": 1,
+    "display_name": "LocalPlayer"
+  },
+  "notes": "Probe ports are discovery listeners only until FIFA 17-specific Blaze/LSX contracts are implemented."
+}
