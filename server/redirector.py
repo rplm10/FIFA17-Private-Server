@@ -20,13 +20,67 @@ class RedirectorHTTPServer(ThreadingHTTPServer):
         backend_port: int,
         backend_secure: bool,
         capture_dir: Path,
+        tls_context: ssl.SSLContext,
     ) -> None:
         self.backend_host = backend_host
         self.backend_port = int(backend_port)
         self.backend_secure = bool(backend_secure)
         self.capture_dir = capture_dir
         self.capture_dir.mkdir(parents=True, exist_ok=True)
+        self.tls_context = tls_context
         super().__init__(address, RedirectorHandler)
+
+    def get_request(self):  # type: ignore[override]
+        """Accept raw TCP first so failed TLS handshakes are visible in the log."""
+        while True:
+            raw_sock, client_address = self.socket.accept()
+            peer = f"{client_address[0]}:{client_address[1]}"
+            print(f"[REDIRECTOR/TCP] accepted {peer}")
+            raw_sock.settimeout(5.0)
+
+            try:
+                tls_sock = self.tls_context.wrap_socket(
+                    raw_sock,
+                    server_side=True,
+                    do_handshake_on_connect=True,
+                )
+                cipher = tls_sock.cipher()
+                cipher_name = cipher[0] if cipher else "unknown"
+                print(
+                    f"[REDIRECTOR/TLS] handshake OK from {peer}: "
+                    f"protocol={tls_sock.version()} cipher={cipher_name}"
+                )
+                tls_sock.settimeout(None)
+                return tls_sock, client_address
+            except ssl.SSLError as exc:
+                self._capture_tls_failure(client_address, exc)
+                print(f"[REDIRECTOR/TLS] handshake FAILED from {peer}: {exc}")
+                try:
+                    raw_sock.close()
+                except OSError:
+                    pass
+            except OSError as exc:
+                self._capture_tls_failure(client_address, exc)
+                print(f"[REDIRECTOR/TLS] socket FAILED from {peer}: {exc}")
+                try:
+                    raw_sock.close()
+                except OSError:
+                    pass
+
+    def _capture_tls_failure(self, client_address: tuple[str, int], exc: BaseException) -> None:
+        stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        path = self.capture_dir / f"redirector_tls_failure_{stamp}.txt"
+        path.write_text(
+            "\n".join(
+                [
+                    f"peer={client_address[0]}:{client_address[1]}",
+                    f"exception_type={type(exc).__name__}",
+                    f"exception={exc}",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
 
 class RedirectorHandler(BaseHTTPRequestHandler):
@@ -153,17 +207,27 @@ def start_redirector_server(
             f"redirector TLS certificate missing: cert={cert} key={key}; run python tools/generate_certs.py"
         )
 
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(certfile=str(cert), keyfile=str(key))
+
+    def log_sni(ssl_sock: ssl.SSLSocket, server_name: str | None, _context: ssl.SSLContext) -> None:
+        try:
+            peer = ssl_sock.getpeername()
+            peer_text = f"{peer[0]}:{peer[1]}"
+        except OSError:
+            peer_text = "unknown"
+        print(f"[REDIRECTOR/TLS] SNI from {peer_text}: {server_name or '<none>'}")
+
+    context.set_servername_callback(log_sni)
+
     server = RedirectorHTTPServer(
         (bind_host, int(port)),
         backend_host=backend_host,
         backend_port=int(backend_port),
         backend_secure=backend_secure,
         capture_dir=Path(capture_dir),
+        tls_context=context,
     )
-
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(certfile=str(cert), keyfile=str(key))
-    server.socket = context.wrap_socket(server.socket, server_side=True)
 
     thread = threading.Thread(target=server.serve_forever, name="redirector-https", daemon=True)
     thread.start()
