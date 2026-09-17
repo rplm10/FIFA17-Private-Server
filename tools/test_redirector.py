@@ -32,6 +32,14 @@ def main() -> int:
         raise SystemExit("CA certificate missing. Run: python tools/generate_certs.py")
 
     context = ssl.create_default_context(cafile=str(CA_CERT))
+    if hasattr(ssl, "TLSVersion"):
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.maximum_version = ssl.TLSVersion.TLSv1_2
+    context.set_ciphers(
+        "AES256-GCM-SHA384:AES128-GCM-SHA256:"
+        "AES256-SHA256:AES128-SHA256:AES256-SHA:AES128-SHA:@SECLEVEL=0"
+    )
+
     connection = http.client.HTTPSConnection("127.0.0.1", 42230, context=context, timeout=5)
     connection.request(
         "POST",
