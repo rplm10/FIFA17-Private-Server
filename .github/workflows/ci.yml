@@ -1,0 +1,30 @@
+name: foundation-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python
+        run: python -m compileall server tools
+      - name: Start server and run smoke tests
+        shell: pwsh
+        run: |
+          $server = Start-Process python -ArgumentList '-m','server.main','--no-probes' -PassThru
+          Start-Sleep -Seconds 2
+          try {
+            python tools/smoke_test.py
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          finally {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }
